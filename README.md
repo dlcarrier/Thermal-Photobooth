@@ -22,3 +22,7 @@ Key bindings:
 * '/': zoom out
 * '5': default zoom
 
+Usage: download photobooth.sh, edit it if necessay, mark it as executible, disable key repeat with xset, and execute it, without any arguments.
+
+If the image isn't updating, inotify may not be working or feh may not be compiled to use it.  Also, even when working, feh doesn't update very quickly; there's probably a better solution.
+
