@@ -2,7 +2,7 @@
 capture_device=/dev/video0
 resolutions=("1024x576" "1280x720" "1920x1080" "2560x1440")
 capture_resolution=2
-update_image=1
+update_image=true
 current_tty=$(tty)
 background_pid=null
 rm /tmp/gray.png 2> /dev/null
@@ -24,13 +24,11 @@ launch_webcam () {
 		sleep 1 #Wait for background_pid to release capture_device
 	fi
 	while [ 1 ]; do
-		if [[ $update_image == 1 ]]; then
-			fswebcam -q -d $capture_device -r ${resolutions[$capture_resolution]} --crop 576x576 --greyscale --no-banner --png 0 /tmp/gray.png
-			convert /tmp/gray.png -flop -remap pattern:gray50 /tmp/preview.png > /dev/null &
-			if [[ $XDG_SESSION_TYPE == "tty" ]]; then
-				read WIDTH HEIGHT DEPTH < <(fbset | awk '/geometry/ { print $2, $3, $6 }')
-				ffmpeg -loglevel error -i /tmp/preview.png -vf "scale=w=${WIDTH}:h=${HEIGHT}:force_original_aspect_ratio=decrease,pad=${WIDTH}:${HEIGHT}:(ow-iw)/2:(oh-ih)/2:color=black" -f rawvideo -pix_fmt bgra -y /dev/fb0 &
-			fi
+		fswebcam -q -d $capture_device -r ${resolutions[$capture_resolution]} --crop 576x576 --greyscale --no-banner --png 0 /tmp/gray.png
+		convert /tmp/gray.png -flop -remap pattern:gray50 /tmp/preview.png > /dev/null &
+		if [[ $XDG_SESSION_TYPE == "tty" ]]; then
+			read WIDTH HEIGHT DEPTH < <(fbset | awk '/geometry/ { print $2, $3, $6 }')
+			ffmpeg -loglevel error -i /tmp/preview.png -vf "scale=w=${WIDTH}:h=${HEIGHT}:force_original_aspect_ratio=decrease,pad=${WIDTH}:${HEIGHT}:(ow-iw)/2:(oh-ih)/2:color=black" -f rawvideo -pix_fmt bgra -y /dev/fb0 &
 		fi
 	done &
 	background_pid=$!
@@ -78,22 +76,29 @@ while [ 1 ]; do
 			exit
 			;;
 		"0")	#Print
-			echo Printing -----------------------------------------------
 			convert /tmp/gray.png -remap pattern:gray50 /tmp/monochrome.png > /dev/null
-			#{lpr /tmp/monochrome.png}
+			lpr /tmp/monochrome.png
 			wait_for_button_release
 			;;
 		"+")	#Reprint
-			echo Reprinting -----------------------------------------------
-			#{lpr /tmp/monochrome.png}
+			lpr /tmp/monochrome.png
 			wait_for_button_release
+			;;
+		"-")	#Pause updates
+			if [[ $update_image == true ]]; then
+				kill $background_pid
+				update_image=false
+			else
+				update_image=true
+				launch_webcam
+			fi
 			;;
 		"5")	#Revert to default zoom
 			capture_resolution=2
 			launch_webcam
 			;;
 		"/")	#Zoom out
-			if [[ $update_image == 1 ]]; then
+			if [[ $update_image == true ]]; then
 				if [[ capture_resolution -gt 0 ]]; then
 					((capture_resolution-=1))
 					launch_webcam
@@ -101,7 +106,7 @@ while [ 1 ]; do
 			fi
 			;;
 		"*")	#Zoom in
-			if [[ $update_image == 1 ]]; then
+			if [[ $update_image == true ]]; then
 				if [[ capture_resolution -lt 3 ]]; then
 					((capture_resolution+=1))
 					launch_webcam
